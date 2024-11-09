@@ -1,29 +1,29 @@
 import java.io.Serializable;
 
 public class Message implements Serializable {
+    // Seri sürüm kimliği (sürüm uyumluluğu için)
     private static final long serialVersionUID = 1L;
-    
+
     private String demand;
     private String response;
 
-    // Ana yapıcı
+    // Ana yapıcı: Hem demand hem response alan
     public Message(String demand, String response) {
         this.demand = demand;
         this.response = response;
     }
 
-    // Sadece "demand" için bir yapıcı
+    // Sadece demand alan yapıcı (response boş olarak ayarlanır)
     public Message(String demand) {
-        this.demand = demand;
-        this.response = "";
+        this(demand, "");
     }
 
-    // Boş bir yapıcı
+    // Boş yapıcı (both demand and response boş olarak ayarlanır)
     public Message() {
-        this.demand = "";
-        this.response = "";
+        this("", "");
     }
 
+    // Getter ve setter metodları
     public String getDemand() {
         return demand;
     }
@@ -42,8 +42,9 @@ public class Message implements Serializable {
 
     @Override
     public String toString() {
-        return "Message { demand: " + demand + ", response: " + response + " }";
+        return "Message { " +
+               "demand='" + demand + '\'' +
+               ", response='" + response + '\'' +
+               " }";
     }
-    
-    
 }

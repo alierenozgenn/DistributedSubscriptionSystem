@@ -113,13 +113,14 @@ loop do
       end
     rescue => e
       puts "Error connecting to #{server[:host]}:#{server[:port]} - #{e.message}"
+      active_servers.delete(server) # Hata oluşursa sunucuyu aktif listesinden çıkar
+      puts "#{server[:host]}:#{server[:port]} has been removed from active servers due to connection issues."
     ensure
       socket.close if socket
     end
   end
 
-  # `active_servers` listesini güncel tutun
-  active_servers.reject! { |server| !server_alive?(server) }
+  # Aktif sunucu sayısını fault_tolerance_level ile karşılaştır
   if active_servers.size < fault_tolerance_level
     puts "Fault tolerance level warning: Active servers are below required level."
   end

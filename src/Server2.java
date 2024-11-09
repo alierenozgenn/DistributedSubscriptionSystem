@@ -17,11 +17,14 @@ public class Server2 extends ServerBase {
         new Thread(() -> {
             try (ServerSocket serverSocket = new ServerSocket(getPort())) {
                 System.out.println("Server2 started on port " + getPort());
-                while (true) {
-                    try (Socket clientSocket = serverSocket.accept();
-                         ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
-                         ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream())) {
 
+                while (true) {
+                    try (
+                        Socket clientSocket = serverSocket.accept();
+                        ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+                        ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())
+                    ) {
+                        // Mesajı al
                         Object inputObject = in.readObject();
                         Message requestMessage;
 
@@ -32,6 +35,7 @@ public class Server2 extends ServerBase {
                             continue;
                         }
 
+                        // Talebe göre yanıt oluştur
                         Message responseMessage;
                         if ("STRT".equals(requestMessage.getDemand())) {
                             responseMessage = new Message("STRT", "YEP");
@@ -39,7 +43,9 @@ public class Server2 extends ServerBase {
                             responseMessage = new Message("STRT", "NOP");
                         }
 
+                        // Yanıt gönder
                         out.writeObject(responseMessage);
+                        out.flush();
                         System.out.println("Server2 sent response: " + responseMessage);
 
                         // Capacity nesnesini oluştur ve plotter'a gönder
@@ -50,7 +56,7 @@ public class Server2 extends ServerBase {
                         System.err.println("Error handling client connection in Server2: " + e.getMessage());
                     }
                 }
-            } catch (Exception e) {
+            } catch (IOException e) {
                 System.err.println("Could not start Server2 on port " + getPort() + ": " + e.getMessage());
             }
         }).start();

@@ -20,13 +20,17 @@ public class Server1 extends ServerBase {
         new Thread(() -> {
             try (ServerSocket serverSocket = new ServerSocket(getPort())) {
                 logger.info("Server1 started on port " + getPort());
-                while (true) {
-                    try (Socket clientSocket = serverSocket.accept();
-                         ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
-                         ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream())) {
 
+                while (true) {
+                    try (
+                        Socket clientSocket = serverSocket.accept();
+                        ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+                        ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())
+                    ) {
+                        // Mesajı al
                         Object inputObject = in.readObject();
                         Message requestMessage;
+
                         if (inputObject instanceof Message) {
                             requestMessage = (Message) inputObject;
                         } else {
@@ -34,6 +38,7 @@ public class Server1 extends ServerBase {
                             continue;
                         }
 
+                        // Talebe göre yanıt oluştur
                         Message responseMessage;
                         if ("STRT".equals(requestMessage.getDemand())) {
                             responseMessage = new Message("STRT", "YEP");
@@ -41,7 +46,9 @@ public class Server1 extends ServerBase {
                             responseMessage = new Message("STRT", "NOP");
                         }
 
+                        // Yanıt gönder
                         out.writeObject(responseMessage);
+                        out.flush();
                         logger.info("Server1 sent response: " + responseMessage);
 
                         // Capacity nesnesini oluştur ve plotter'a gönder
@@ -52,7 +59,7 @@ public class Server1 extends ServerBase {
                         logger.severe("Error handling client connection in Server1: " + e.getMessage());
                     }
                 }
-            } catch (Exception e) {
+            } catch (IOException e) {
                 logger.severe("Could not start Server1 on port " + getPort() + ": " + e.getMessage());
             }
         }).start();
@@ -69,6 +76,7 @@ public class Server1 extends ServerBase {
             ));
             plotterOut.println(capacityJson);
             logger.info("Sent capacity data to plotter: " + capacityJson);
+
         } catch (IOException e) {
             logger.severe("Error sending capacity data to plotter: " + e.getMessage());
         }

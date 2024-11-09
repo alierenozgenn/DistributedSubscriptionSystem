@@ -1,13 +1,14 @@
-import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import com.google.gson.Gson;
 
 public abstract class ServerBase {
     private final int port;
     private static final Logger logger = Logger.getLogger(ServerBase.class.getName());
+    private static final Gson gson = new Gson();
 
     public ServerBase(int port) {
         this.port = port;
@@ -23,14 +24,23 @@ public abstract class ServerBase {
                 logger.info("Server started on port " + port);
                 while (true) {
                     try (Socket clientSocket = serverSocket.accept();
-                         ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream())) {
+                         PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+                         BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
 
                         logger.info("New connection established with " + clientSocket.getInetAddress());
 
-                        // İsteğe bağlı işlem yapılabilir
-                        Message responseMessage = new Message("Connection", "Established");
-                        out.writeObject(responseMessage);  // Mesajı gönder
-                        logger.info("Sent response: " + responseMessage);
+                        // İstemciden gelen JSON verisini oku
+                        String requestJson = in.readLine();
+                        if (requestJson != null) {
+                            Message requestMessage = gson.fromJson(requestJson, Message.class);
+                            logger.info("Received request: " + requestMessage);
+
+                            // Mesaja bağlı olarak yanıt oluştur
+                            Message responseMessage = new Message("Connection", "Established");
+                            String responseJson = gson.toJson(responseMessage);
+                            out.println(responseJson);  // JSON formatında yanıt gönder
+                            logger.info("Sent response: " + responseJson);
+                        }
 
                     } catch (IOException e) {
                         logger.log(Level.SEVERE, "Error handling client connection: " + e.getMessage(), e);
@@ -45,14 +55,23 @@ public abstract class ServerBase {
     public void connectToServer(String host, int port) {
         new Thread(() -> {
             try (Socket socket = new Socket(host, port);
-                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
+                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                 BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
 
                 logger.info("Connected to server on " + host + ":" + port);
 
-                // Sunucuya bağlantı yapıldıktan sonra bir işlem gerçekleştirebilirsiniz
+                // Sunucuya JSON formatında bir mesaj gönder
                 Message message = new Message("STRT", "Connecting");
-                out.writeObject(message);
-                logger.info("Sent message to server: " + message);
+                String messageJson = gson.toJson(message);
+                out.println(messageJson);
+                logger.info("Sent message to server: " + messageJson);
+
+                // Sunucudan gelen yanıtı oku
+                String responseJson = in.readLine();
+                if (responseJson != null) {
+                    Message responseMessage = gson.fromJson(responseJson, Message.class);
+                    logger.info("Received response from server: " + responseMessage);
+                }
 
             } catch (IOException e) {
                 logger.log(Level.SEVERE, "Could not connect to server on " + host + ":" + port + ": " + e.getMessage(), e);

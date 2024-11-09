@@ -6,6 +6,13 @@ import matplotlib.pyplot as plt
 HOST = 'localhost'
 PORT = 12348  # Plotter için kullanılacak port
 
+# Sunucu ID'lerine göre renkler
+server_colors = {
+    "server1_status": "red",
+    "server2_status": "green",
+    "server3_status": "blue"
+}
+
 # Plotter'ı başlat
 def start_plotter():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -35,14 +42,21 @@ def plot_capacity(capacity_data):
         # Kapasite verilerini sunucu ID'lerine göre ayır
         server_ids = list(capacity_data.keys())
         server_status = [capacity_data[server_id] for server_id in server_ids]
+        colors = [server_colors.get(server_id, 'gray') for server_id in server_ids]  # Renkleri atar
 
         # Grafik oluşturma
         plt.clf()  # Önceki grafiği temizle
-        plt.bar(server_ids, server_status, color=['red', 'green', 'blue'])
+        plt.bar(server_ids, server_status, color=colors)
         plt.title('Server Capacity Status')
         plt.xlabel('Server ID')
         plt.ylabel('Capacity Status')
         plt.ylim(0, 1000)  # Kapasite değerlerinin ölçeğini ayarla
+
+        # Legend (açıklama) ekleme
+        for server_id, color in server_colors.items():
+            plt.bar(0, 0, color=color, label=server_id)  # Dummy bar for legend
+        plt.legend(title="Sunucu Renkleri")
+        
         plt.draw()  # Etkileşimli çizim
         plt.pause(0.05)  # Grafiği güncellemek için küçük bir bekleme süresi
     except KeyError as e:
