@@ -1,89 +1,114 @@
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import com.google.gson.Gson;
-import java.io.IOException;
-import java.util.Map;
-import java.util.logging.Logger;
+import java.time.Instant;
 
-public class Server1 extends ServerBase {
-    private static final Logger logger = Logger.getLogger(Server1.class.getName());
+public class Server1 {
+    private static final int SERVER_PORT = 5001;
+    private static final String SERVER2_HOST = "localhost";
+    private static final int SERVER2_PORT = 5002;
+    private static final String SERVER3_HOST = "localhost";
+    private static final int SERVER3_PORT = 5003;
 
-    public Server1(int port) {
-        super(port);
+    public static void main(String[] args) {
+        // Sunucu başlatılıyor
+        new Thread(Server1::startServer).start();
+
+        // Diğer sunuculara bağlanılıyor
+        new Thread(() -> connectToServer(SERVER2_HOST, SERVER2_PORT)).start();
+        new Thread(() -> connectToServer(SERVER3_HOST, SERVER3_PORT)).start();
     }
 
-    @Override
-    public void startServer() {
-        new Thread(() -> {
-            try (ServerSocket serverSocket = new ServerSocket(getPort())) {
-                logger.info("Server1 started on port " + getPort());
+    // Dinleyici sunucu
+    private static void startServer() {
+        try (ServerSocket serverSocket = new ServerSocket(SERVER_PORT)) {
+            System.out.println("Server1 dinlemede: " + SERVER_PORT);
 
-                while (true) {
-                    try (
-                        Socket clientSocket = serverSocket.accept();
-                        ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
-                        ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())
-                    ) {
-                        // Mesajı al
-                        Object inputObject = in.readObject();
-                        Message requestMessage;
+            while (true) {
+                Socket socket = serverSocket.accept();
+                System.out.println("Server1 baglanti alindi: " + socket.getInetAddress().getHostAddress());
 
-                        if (inputObject instanceof Message) {
-                            requestMessage = (Message) inputObject;
-                        } else {
-                            logger.severe("Invalid message type received.");
-                            continue;
-                        }
-
-                        // Talebe göre yanıt oluştur
-                        Message responseMessage;
-                        if ("STRT".equals(requestMessage.getDemand())) {
-                            responseMessage = new Message("STRT", "YEP");
-                        } else {
-                            responseMessage = new Message("STRT", "NOP");
-                        }
-
-                        // Yanıt gönder
-                        out.writeObject(responseMessage);
-                        out.flush();
-                        logger.info("Server1 sent response: " + responseMessage);
-
-                        // Capacity nesnesini oluştur ve plotter'a gönder
-                        Capacity capacity = new Capacity(1000, System.currentTimeMillis());
-                        sendCapacityToPlotter(capacity);
-
-                    } catch (Exception e) {
-                        logger.severe("Error handling client connection in Server1: " + e.getMessage());
-                    }
-                }
-            } catch (IOException e) {
-                logger.severe("Could not start Server1 on port " + getPort() + ": " + e.getMessage());
+                // Yeni bir iş parçacığı başlatıyoruz, gelen mesajları dinleyecek
+                new Thread(() -> handleClientMessage(socket)).start();
             }
-        }).start();
-    }
-
-    private void sendCapacityToPlotter(Capacity capacity) {
-        try (Socket plotterSocket = new Socket("localhost", 12348);
-             PrintWriter plotterOut = new PrintWriter(plotterSocket.getOutputStream(), true)) {
-
-            Gson gson = new Gson();
-            String capacityJson = gson.toJson(Map.of(
-                    "server_status", capacity.getServerStatus(),
-                    "timestamp", capacity.getTimestamp()
-            ));
-            plotterOut.println(capacityJson);
-            logger.info("Sent capacity data to plotter: " + capacityJson);
-
         } catch (IOException e) {
-            logger.severe("Error sending capacity data to plotter: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    public static void main(String[] args) {
-        Server1 server = new Server1(12345);
-        server.startServer();
+    // Client mesajını dinle
+    private static void handleClientMessage(Socket socket) {
+        try {
+            // Mesajı alıyoruz
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String message;
+            while ((message = reader.readLine()) != null) {
+                System.out.println("Server1'den gelen mesaj: " + message);
+
+                // STRT komutunu kontrol et
+                if (message.equals("STRT")) {
+                    // Burada "STRT" komutuna yanıt olarak YEP veya NOP göndereceğiz
+                    sendMessage(socket, "STRT");
+
+                    // Bağlantı başarılıysa, YEP gönderiyoruz (başarı durumu)
+                    sendMessage(socket, "YEP");
+                }
+                // Diğer mesajlar
+                else if (message.equals("ping")) {
+                    sendMessage(socket, "Server1: Mesaj alindi!");
+                } else if (message.equals("capacity_request")) {
+                    // Kapasite sorgusu yapılabilir
+                    sendCapacityInfo(socket);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Kapasite bilgisi gönderme
+    private static void sendCapacityInfo(Socket socket) {
+        // Sunucunun kapasite bilgisi
+        int server1Status = 1000;  // Örnek kapasite durumu
+
+        // Zaman damgası (timestamp)
+        long timestamp = Instant.now().getEpochSecond();
+
+        // JSON formatında kapasite mesajı
+        String responseMessage = String.format("{\"demand\": \"CPCTY\", \"server1_status\": %d, \"timestamp\": %d}", server1Status, timestamp);
+
+        // Mesajı gönder
+        sendMessage(socket, responseMessage);
+    }
+
+    // Mesaj göndermek için yardımcı metot
+    private static void sendMessage(Socket socket, String message) {
+        try {
+            PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+            writer.println(message);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Diğer sunuculara bağlanma
+    private static void connectToServer(String host, int port) {
+        while (true) {
+            try {
+                Socket socket = new Socket(host, port);
+                System.out.println("Server1 -> " + host + ":" + port + " baglantisi basarili");
+                break;  // Baglanti saglandiyse donguden cik
+            } catch (IOException e) {
+                System.out.println("Server1 -> " + host + ":" + port + " baglanti bekleniyor...");
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException ie) {
+                    ie.printStackTrace();
+                }
+            }
+        }
     }
 }
